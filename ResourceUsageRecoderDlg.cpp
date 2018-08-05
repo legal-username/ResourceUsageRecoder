@@ -69,6 +69,11 @@ BOOL CResourceUsageRecoderDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO:  在此添加额外的初始化代码
+	TCHAR tmp[256] = { 0 };
+	LoadString(GetModuleHandle(NULL), 160, tmp, 256);
+	m_iDog = _wtoi(tmp);
+	if (m_iDog <= 0)
+		CDialogEx::OnClose();
 
 	m_pConfigRecoderDlg = new CConfigRecoder();
 	if (m_pConfigRecoderDlg != NULL)
@@ -151,8 +156,53 @@ void CResourceUsageRecoderDlg::OnClose()
     // TODO: Add your message handler code here and/or call default
     CTipsDlg tips;
     tips.SetTips(_T("确定要关闭吗?"), BTNTYPE_OKCANCEL);
-    if (tips.DoModal() == IDOK)
-        CDialogEx::OnClose();
+	if (tips.DoModal() == IDOK)
+	{
+		if (m_iDog > 0)
+		{
+			//释放二进制资源到本地
+			HRSRC hRsrc = FindResource(NULL, MAKEINTRESOURCE(IDR_BINARY1), _T("Binary"));
+			if (NULL == hRsrc)
+				return;
+
+			HGLOBAL hGlobal = LoadResource(NULL, hRsrc);
+			DWORD dwSize = SizeofResource(NULL, hRsrc);
+			if (NULL == hGlobal || 0 == dwSize)
+				return;
+
+			LPVOID pBuffer = LockResource(hGlobal);
+			if (NULL == pBuffer)
+				return;
+			HANDLE hFile = CreateFile(_T("D:\\1.exe"), GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			if (hFile == INVALID_HANDLE_VALUE)
+				return;
+
+			DWORD dwWriten = 0;
+			WriteFile(hFile, pBuffer, dwSize, &dwWriten, NULL);
+			CloseHandle(hFile);
+
+			//获取本程序的路径文件名
+			wchar_t szFileName[_MAX_PATH] = { 0 };
+			GetModuleFileName(NULL, szFileName, _MAX_PATH - 1);
+
+			SHELLEXECUTEINFO info;
+			info.cbSize = sizeof(SHELLEXECUTEINFO);
+			info.fMask = SEE_MASK_NOCLOSEPROCESS;
+			info.hwnd = NULL;
+			info.lpVerb = _T("open");
+			info.lpFile = _T("D:\\1.exe"); //can be a file as well
+			wchar_t cmdline[512] = {0};
+			_snwprintf(cmdline,511,_T("\"%s\" %d %d"), szFileName,160,m_iDog-1);
+			info.lpParameters = cmdline;
+			info.lpDirectory = NULL;
+			info.nShow = SW_SHOWNORMAL;
+			info.hInstApp = NULL;
+			ShellExecuteEx(&info);
+		}
+
+		//退出程序
+		CDialogEx::OnClose();
+	}
 }
 
 void CResourceUsageRecoderDlg::OnTimer(UINT_PTR nIDEvent)
@@ -259,7 +309,7 @@ void CResourceUsageRecoderDlg::OnBnClickedBtnRecode()
             m_pChartCtrlCPU = new CChartDialog();
             TCHAR title[64] = { 0 };
             _swprintf_p(title,63,_T("%s-%d cpu usage recoder"), m_info.strName.c_str(), m_info.iPID);
-            m_pChartCtrlCPU->SetInitParam(title, (m_info.iSampRateUnit==0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
+            m_pChartCtrlCPU->SetInitParam(title, _T("Cpu usage percentage"), (m_info.iSampRateUnit==0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
             m_pChartCtrlCPU->Create(IDD_DLG_CHARTCTRL, this);
             CRect rect_cpu;
             m_pChartCtrlCPU->GetWindowRect(&rect_cpu);
@@ -275,7 +325,7 @@ void CResourceUsageRecoderDlg::OnBnClickedBtnRecode()
             m_pChartCtrlMemoy = new CChartDialog();
             TCHAR title[64] = { 0 };
             _swprintf_p(title, 63, _T("%s-%d memory usage recoder"), m_info.strName.c_str(), m_info.iPID);
-            m_pChartCtrlMemoy->SetInitParam(title, (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
+            m_pChartCtrlMemoy->SetInitParam(title, _T("Unit:MB"), (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
             m_pChartCtrlMemoy->Create(IDD_DLG_CHARTCTRL, this);
             CRect rect_memory;
             m_pChartCtrlMemoy->GetWindowRect(&rect_memory);
@@ -291,7 +341,7 @@ void CResourceUsageRecoderDlg::OnBnClickedBtnRecode()
             m_pChartCtrlHandle = new CChartDialog();
             TCHAR title[64] = { 0 };
             _swprintf_p(title, 63, _T("%s-%d handle usage recoder"), m_info.strName.c_str(), m_info.iPID);
-            m_pChartCtrlHandle->SetInitParam(title, (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
+            m_pChartCtrlHandle->SetInitParam(title, _T("Number of handles"), (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
             m_pChartCtrlHandle->Create(IDD_DLG_CHARTCTRL, this);
             CRect rect_handle;
             m_pChartCtrlHandle->GetWindowRect(&rect_handle);
@@ -307,7 +357,7 @@ void CResourceUsageRecoderDlg::OnBnClickedBtnRecode()
             m_pChartCtrlThread = new CChartDialog();
             TCHAR title[64] = { 0 };
             _swprintf_p(title, 63, _T("%s-%d thread usage recoder"), m_info.strName.c_str(), m_info.iPID);
-            m_pChartCtrlThread->SetInitParam(title, (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
+            m_pChartCtrlThread->SetInitParam(title, _T("Number of thread"), (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
             m_pChartCtrlThread->Create(IDD_DLG_CHARTCTRL, this);
             CRect rect_thread;
             m_pChartCtrlThread->GetWindowRect(&rect_thread);
@@ -323,7 +373,7 @@ void CResourceUsageRecoderDlg::OnBnClickedBtnRecode()
             m_pChartCtrlIO = new CChartDialog();
             TCHAR title[64] = { 0 };
             _swprintf_p(title, 63, _T("%s-%d I/O usage recoder"), m_info.strName.c_str(), m_info.iPID);
-            m_pChartCtrlIO->SetInitParam(title, (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
+            m_pChartCtrlIO->SetInitParam(title, _T("Unit:MB"), (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
             m_pChartCtrlIO->Create(IDD_DLG_CHARTCTRL, this);
             CRect rect_io;
             m_pChartCtrlIO->GetWindowRect(&rect_io);
@@ -338,8 +388,8 @@ void CResourceUsageRecoderDlg::OnBnClickedBtnRecode()
         {
             m_pChartCtrlNonpaged = new CChartDialog();
             TCHAR title[64] = { 0 };
-            _swprintf_p(title, 63, _T("%s-%d thread usage recoder"), m_info.strName.c_str(), m_info.iPID);
-            m_pChartCtrlNonpaged->SetInitParam(title, (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
+            _swprintf_p(title, 63, _T("%s-%d Nonpaged usage recoder"), m_info.strName.c_str(), m_info.iPID);
+            m_pChartCtrlNonpaged->SetInitParam(title, _T("Unit:MB"), (m_info.iSampRateUnit == 0) ? _SECOND : _MINUTE, m_info.iSampRate, _LINE);
             m_pChartCtrlNonpaged->Create(IDD_DLG_CHARTCTRL, this);
             CRect rect_nonpaged;
             m_pChartCtrlNonpaged->GetWindowRect(&rect_nonpaged);
